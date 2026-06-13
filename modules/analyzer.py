@@ -13,57 +13,104 @@ client = OpenAI(
 )
 
 def analyze_resume(resume_text: str, job_description: str) -> dict:  # define function taking resume text and job description, returning a dict
-    """Send resume and job description to OpenAI GPT and return structured analysis."""  # docstring
+    """Send resume and job description to Hugging Face model and return precise structured analysis."""  # docstring
 
-    prompt = f"""You are an expert ATS resume analyzer.
+    prompt = f"""You are a strict and precise ATS (Applicant Tracking System) resume analyst.
 
+Your job is to compare the RESUME below against the JOB DESCRIPTION below and return a highly accurate analysis.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RESUME:
 {resume_text}
-
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 JOB DESCRIPTION:
 {job_description}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Respond ONLY in this exact JSON format with no extra text, no markdown, no code blocks:
+STRICT RULES YOU MUST FOLLOW:
+
+1. MATCHING SKILLS:
+   - Only list skills that are EXPLICITLY present in BOTH the resume AND the job description.
+   - Do NOT invent skills. Do NOT assume. Only include a skill if it appears clearly in both documents.
+   - Match semantically: "JS" = "JavaScript", "ML" = "Machine Learning", "React" = "React.js" are the same.
+
+2. MISSING SKILLS:
+   - Only list skills that are EXPLICITLY required or mentioned in the job description but are ABSENT from the resume.
+   - Do NOT list generic skills like "communication" or "teamwork" unless the JD specifically requires them.
+   - Do NOT make up skills the JD never asked for.
+
+3. MATCH PERCENTAGE:
+   - Calculate honestly: (number of JD-required skills found in resume) / (total skills required in JD) * 100
+   - Adjust slightly (+/- 5%) for relevant experience, projects, or domain alignment.
+   - Do NOT inflate or deflate. Be accurate.
+
+4. STRENGTHS:
+   - Write 3-4 specific strengths based on what is actually written in the resume.
+   - Reference real details: actual project names, real companies, real technologies from the resume.
+   - Be specific. Do NOT write generic praise.
+
+5. AREAS FOR IMPROVEMENT:
+   - Write 2-3 specific, actionable improvement points directly tied to what the JD requires and the resume lacks.
+   - Reference actual missing skills or experiences from the JD.
+   - Do NOT give generic advice like "improve your resume formatting".
+
+6. AI SUGGESTIONS:
+   - Write 3-4 sentences of highly specific, personalized career advice.
+   - Mention the candidate's actual projects, actual skills, and actual gaps from the JD.
+   - Tell them exactly what to learn, build, or do next based on THEIR resume and THIS specific job.
+   - Be direct, practical, and specific. No generic advice.
+
+7. RECOMMENDATION:
+   - "Strong Match" = 70% or above
+   - "Moderate Match" = 40-69%
+   - "Weak Match" = below 40%
+
+Respond ONLY in this exact JSON format. No markdown, no code blocks, no extra text:
 {{
     "match_percentage": <integer 0-100>,
-    "matching_skills": ["skill1", "skill2"],
-    "missing_skills": ["skill1", "skill2"],
-    "strengths": ["point1", "point2"],
-    "improvements": ["point1", "point2"],
-    "ai_suggestions": "2-3 sentence personalized advice",
+    "matching_skills": ["only skills present in BOTH resume and JD"],
+    "missing_skills": ["only skills the JD requires that are NOT in the resume"],
+    "strengths": ["specific strength 1 with real resume details", "specific strength 2", "specific strength 3"],
+    "improvements": ["specific improvement 1 tied to JD gap", "specific improvement 2", "specific improvement 3"],
+    "ai_suggestions": "3-4 sentences of specific, personalized advice referencing actual resume content and JD requirements",
     "recommendation": "Strong Match | Moderate Match | Weak Match"
-}}"""  # build the structured prompt with resume text and job description injected
+}}"""  # build the highly detailed and strict prompt
 
     try:  # begin try block to catch any API or parsing errors
 
-        response = client.chat.completions.create(  # call the OpenAI Chat Completions API
+        response = client.chat.completions.create(  # call the Hugging Face Inference Providers API
             model="meta-llama/Llama-3.1-8B-Instruct:cheapest",  # use Llama 3.1 8B via cheapest HF provider
             messages=[  # pass the conversation messages list
                 {
-                    "role": "system",  # system message sets the assistant's behaviour
-                    "content": "You are an expert ATS resume analyzer. Always respond with valid JSON only."  # instruct the model to return JSON only
+                    "role": "system",  # system message sets strict behavior for the model
+                    "content": (
+                        "You are a strict ATS resume analyst. "
+                        "You ONLY report skills that genuinely appear in both documents. "
+                        "You NEVER invent, assume, or hallucinate skills. "
+                        "You always respond with valid JSON only and nothing else."
+                    )
                 },
                 {
-                    "role": "user",  # user message contains the actual resume and JD
-                    "content": prompt  # inject the full prompt with resume and job description
+                    "role": "user",  # user message contains the full analysis prompt
+                    "content": prompt  # inject the detailed prompt with resume and JD
                 }
             ],
-            temperature=0.3,  # low temperature for consistent, deterministic JSON output
-            max_tokens=1000  # cap the response length to avoid runaway token usage
+            temperature=0.1,  # very low temperature for maximum accuracy and consistency
+            max_tokens=1500  # allow enough tokens for detailed, specific responses
         )
 
-        raw_text = response.choices[0].message.content  # extract the response text from the first completion choice
+        raw_text = response.choices[0].message.content  # extract the response text from the completion
 
-        cleaned_text = raw_text.strip()  # strip leading and trailing whitespace from the response
+        cleaned_text = raw_text.strip()  # strip leading and trailing whitespace
 
-        if cleaned_text.startswith("```json"):  # check if response starts with markdown json code fence
-            cleaned_text = cleaned_text[7:]  # remove the opening ```json marker (7 characters)
+        if cleaned_text.startswith("```json"):  # check for markdown json code fence
+            cleaned_text = cleaned_text[7:]  # remove the opening ```json marker
 
-        if cleaned_text.startswith("```"):  # check if response starts with plain markdown code fence
-            cleaned_text = cleaned_text[3:]  # remove the opening ``` marker (3 characters)
+        if cleaned_text.startswith("```"):  # check for plain markdown code fence
+            cleaned_text = cleaned_text[3:]  # remove the opening ``` marker
 
-        if cleaned_text.endswith("```"):  # check if response ends with closing markdown code fence
-            cleaned_text = cleaned_text[:-3]  # remove the closing ``` marker (3 characters from end)
+        if cleaned_text.endswith("```"):  # check for closing markdown code fence
+            cleaned_text = cleaned_text[:-3]  # remove the closing ``` marker
 
         cleaned_text = cleaned_text.strip()  # strip any remaining whitespace after fence removal
 
@@ -72,7 +119,7 @@ Respond ONLY in this exact JSON format with no extra text, no markdown, no code 
         return result  # return the parsed dictionary containing all analysis fields
 
     except json.JSONDecodeError as e:  # catch JSON parsing failures specifically
-        return {"error": f"Failed to parse OpenAI response as JSON: {str(e)}"}  # return error dict with parse message
+        return {"error": f"Failed to parse AI response as JSON: {str(e)}"}  # return error dict with message
 
-    except Exception as e:  # catch any other unexpected exceptions (network errors, auth errors, etc.)
-        return {"error": f"OpenAI API error: {str(e)}"}  # return error dict with the exception message
+    except Exception as e:  # catch any other unexpected exceptions
+        return {"error": f"AI API error: {str(e)}"}  # return error dict with exception message
