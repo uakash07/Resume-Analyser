@@ -1,125 +1,129 @@
-import os  # import os module to access environment variables
-import json  # import json module to parse the AI response
-from openai import OpenAI  # import the OpenAI client class from the openai library
-from dotenv import load_dotenv  # import load_dotenv to read the .env file
+import os
+import json
+from openai import OpenAI
+from dotenv import load_dotenv
 
-load_dotenv()  # load all variables from the .env file into the environment
+load_dotenv()
 
-HF_TOKEN = os.getenv("HF_TOKEN")  # retrieve the Hugging Face token from environment variables
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 
 client = OpenAI(
-    api_key=HF_TOKEN,
-    base_url="https://router.huggingface.co/v1"
+    api_key=NVIDIA_API_KEY,
+    base_url="https://integrate.api.nvidia.com/v1"
 )
 
-def analyze_resume(resume_text: str, job_description: str) -> dict:  # define function taking resume text and job description, returning a dict
-    """Send resume and job description to Hugging Face model and return precise structured analysis."""  # docstring
+def analyze_resume(resume_text: str, job_description: str) -> dict:
+    """Analyze resume against job description with semantic matching and weighted scoring."""
 
-    prompt = f"""You are a strict and precise ATS (Applicant Tracking System) resume analyst.
+    prompt = f"""You are a senior technical recruiter and ATS expert with 15+ years of experience.
 
-Your job is to compare the RESUME below against the JOB DESCRIPTION below and return a highly accurate analysis.
+Analyze this resume against the job description.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RESUME:
 {resume_text}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 JOB DESCRIPTION:
 {job_description}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-STRICT RULES YOU MUST FOLLOW:
+RULES:
 
-1. MATCHING SKILLS:
-   - Only list skills that are EXPLICITLY present in BOTH the resume AND the job description.
-   - Do NOT invent skills. Do NOT assume. Only include a skill if it appears clearly in both documents.
-   - Match semantically: "JS" = "JavaScript", "ML" = "Machine Learning", "React" = "React.js" are the same.
+1. SEMANTIC MATCHING:
+   - "MongoDB" IS a "NoSQL database" — match it.
+   - "Scikit-learn" IS "Machine Learning" — match it.
+   - "FastAPI" IS "API Development" — match it.
+   - "Telemetry analysis" IS "Data Mining" — match it.
+   - "House Captain" IS "Leadership" — match it.
+   - Do NOT do blind keyword matching. Understand what each skill actually means.
+   - Be lenient and intelligent about synonyms and related concepts.
 
-2. MISSING SKILLS:
-   - Only list skills that are EXPLICITLY required or mentioned in the job description but are ABSENT from the resume.
-   - Do NOT list generic skills like "communication" or "teamwork" unless the JD specifically requires them.
-   - Do NOT make up skills the JD never asked for.
+2. PARTIAL MATCHES:
+   - If the resume covers a concept but not the exact tool/level → "Partial Match"
+   - Example: resume has "MongoDB" and JD asks for "NoSQL databases" → Partial Match
+   - Example: resume has "FastF1/Plotly" and JD asks for "Data Visualization Tools" → Partial Match
+   - Example: resume has "basic SQL" and JD asks for "complex querying" → Partial Match
 
 3. MATCH PERCENTAGE:
-   - Calculate honestly: (number of JD-required skills found in resume) / (total skills required in JD) * 100
-   - Adjust slightly (+/- 5%) for relevant experience, projects, or domain alignment.
-   - Do NOT inflate or deflate. Be accurate.
+   Weight the score across these categories:
+   - Technical Skills (40%)
+   - Projects & Experience (20%)
+   - Experience Level (20%)
+   - Leadership & Soft Skills (10%)
+   - Domain Alignment (10%)
 
-4. STRENGTHS:
-   - Write 3-4 specific strengths based on what is actually written in the resume.
-   - Reference real details: actual project names, real companies, real technologies from the resume.
-   - Be specific. Do NOT write generic praise.
+   A fresher with exact technical skills should NOT score the same as a 6-year experienced professional. Penalize experience gaps.
 
-5. AREAS FOR IMPROVEMENT:
-   - Write 2-3 specific, actionable improvement points directly tied to what the JD requires and the resume lacks.
-   - Reference actual missing skills or experiences from the JD.
-   - Do NOT give generic advice like "improve your resume formatting".
+4. STRENGTHS: 2-4 specific points referencing actual resume content.
 
-6. AI SUGGESTIONS:
-   - Write 3-4 sentences of highly specific, personalized career advice.
-   - Mention the candidate's actual projects, actual skills, and actual gaps from the JD.
-   - Tell them exactly what to learn, build, or do next based on THEIR resume and THIS specific job.
-   - Be direct, practical, and specific. No generic advice.
+5. IMPROVEMENTS: 2-3 points tied directly to JD gaps.
+
+6. AI SUGGESTIONS: 3-4 sentences of personalized advice.
 
 7. RECOMMENDATION:
-   - "Strong Match" = 70% or above
-   - "Moderate Match" = 40-69%
-   - "Weak Match" = below 40%
+   - "Strong Match" = 75%+ with relevant experience
+   - "Moderate Match" = 50-74%
+   - "Weak Match" = below 50%
 
-Respond ONLY in this exact JSON format. No markdown, no code blocks, no extra text:
+Respond ONLY with this exact JSON:
 {{
     "match_percentage": <integer 0-100>,
-    "matching_skills": ["only skills present in BOTH resume and JD"],
-    "missing_skills": ["only skills the JD requires that are NOT in the resume"],
-    "strengths": ["specific strength 1 with real resume details", "specific strength 2", "specific strength 3"],
-    "improvements": ["specific improvement 1 tied to JD gap", "specific improvement 2", "specific improvement 3"],
-    "ai_suggestions": "3-4 sentences of specific, personalized advice referencing actual resume content and JD requirements",
+    "matching_skills": ["skills fully present in both"],
+    "partial_matching_skills": ["skills partially covered"],
+    "missing_skills": ["skills in JD absent from resume"],
+    "strengths": ["specific point 1", "specific point 2"],
+    "improvements": ["specific point 1", "specific point 2"],
+    "ai_suggestions": "personalized advice here",
     "recommendation": "Strong Match | Moderate Match | Weak Match"
-}}"""  # build the highly detailed and strict prompt
+}}"""
 
-    try:  # begin try block to catch any API or parsing errors
+    try:
 
-        response = client.chat.completions.create(  # call the Hugging Face Inference Providers API
-            model="meta-llama/Llama-3.1-8B-Instruct:cheapest",  # use Llama 3.1 8B via cheapest HF provider
-            messages=[  # pass the conversation messages list
+        response = client.chat.completions.create(
+            model="meta/llama-3.1-8b-instruct",
+            messages=[
                 {
-                    "role": "system",  # system message sets strict behavior for the model
+                    "role": "system",
                     "content": (
-                        "You are a strict ATS resume analyst. "
-                        "You ONLY report skills that genuinely appear in both documents. "
-                        "You NEVER invent, assume, or hallucinate skills. "
-                        "You always respond with valid JSON only and nothing else."
+                        "You are a precise ATS resume analyzer. "
+                        "You use semantic understanding, not keyword matching. "
+                        "Respond with valid JSON only."
                     )
                 },
                 {
-                    "role": "user",  # user message contains the full analysis prompt
-                    "content": prompt  # inject the detailed prompt with resume and JD
+                    "role": "user",
+                    "content": prompt
                 }
             ],
-            temperature=0.1,  # very low temperature for maximum accuracy and consistency
-            max_tokens=1500  # allow enough tokens for detailed, specific responses
+            temperature=0.1,
+            max_tokens=1500
         )
 
-        raw_text = response.choices[0].message.content  # extract the response text from the completion
+        raw_text = response.choices[0].message.content
 
-        cleaned_text = raw_text.strip()  # strip leading and trailing whitespace
+        cleaned_text = raw_text.strip()
 
-        if cleaned_text.startswith("```json"):  # check for markdown json code fence
-            cleaned_text = cleaned_text[7:]  # remove the opening ```json marker
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
 
-        if cleaned_text.startswith("```"):  # check for plain markdown code fence
-            cleaned_text = cleaned_text[3:]  # remove the opening ``` marker
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
 
-        if cleaned_text.endswith("```"):  # check for closing markdown code fence
-            cleaned_text = cleaned_text[:-3]  # remove the closing ``` marker
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
 
-        cleaned_text = cleaned_text.strip()  # strip any remaining whitespace after fence removal
+        cleaned_text = cleaned_text.strip()
 
-        result = json.loads(cleaned_text)  # parse the cleaned JSON string into a Python dictionary
+        json_start = cleaned_text.find("{")
+        json_end = cleaned_text.rfind("}") + 1
 
-        return result  # return the parsed dictionary containing all analysis fields
+        if json_start != -1 and json_end > json_start:
+            cleaned_text = cleaned_text[json_start:json_end]
 
-    except json.JSONDecodeError as e:  # catch JSON parsing failures specifically
-        return {"error": f"Failed to parse AI response as JSON: {str(e)}"}  # return error dict with message
+        result = json.loads(cleaned_text)
 
-    except Exception as e:  # catch any other unexpected exceptions
-        return {"error": f"AI API error: {str(e)}"}  # return error dict with exception message
+        return result
+
+    except json.JSONDecodeError as e:
+        return {"error": f"Failed to parse AI response as JSON: {str(e)}"}
+
+    except Exception as e:
+        return {"error": f"API error: {str(e)}"}
