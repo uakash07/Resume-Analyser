@@ -282,3 +282,12 @@ elif mode == "Bulk Resume Ranking":
 
             else:
                 st.error("No resumes could be analyzed successfully. Please check your PDFs and try again.")
+
+st.markdown("---")
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown("**Technologies:** Streamlit, PyMuPDF, Hugging Face Inference")
+with col2:
+    st.markdown("**Author:** Akash U")
+with col3:
+    st.markdown("**GitHub:** [uakash07/Resume-Analyser](https://github.com/uakash07/Resume-Analyser)")
