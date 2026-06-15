@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from modules import extract_text, analyze_resume, rank_candidates
 
@@ -155,29 +154,78 @@ if mode == "Single Resume":
 
                     st.divider()
 
-                    st.markdown("**Visualizations**")
+                    st.markdown("**Analysis Visualizations**")
 
-                    bdata = {
-                        "Technical Skills": breakdown.get("technical_skills", 0),
-                        "Domain Experience": breakdown.get("domain_experience", 0),
-                        "Projects": breakdown.get("projects", 0),
-                        "Education": breakdown.get("education", 0),
-                        "Certifications": breakdown.get("certifications", 0),
-                        "Soft Skills": breakdown.get("soft_skills", 0),
-                    }
-                    if any(v > 0 for v in bdata.values()):
-                        df_bd = pd.DataFrame(list(bdata.items()), columns=["Category", "Score"])
-                        st.bar_chart(df_bd.set_index("Category"), height=300)
-                    else:
-                        st.caption("Scoring breakdown not available from AI response.")
+                    w1, w2 = st.columns(2)
 
-                    st.bar_chart(
-                        pd.DataFrame({
-                            "Skill Type": ["Matching", "Transferable", "Missing"],
-                            "Count": [len(matched), len(transferable), len(missing)]
-                        }).set_index("Skill Type"),
-                        height=300
-                    )
+                    with w1:
+                        fig = go.Figure(go.Indicator(
+                            mode="gauge+number",
+                            value=score,
+                            domain=dict(x=[0, 1], y=[0, 1]),
+                            number=dict(suffix="/100", font=dict(size=36)),
+                            gauge=dict(
+                                axis=dict(range=[0, 100], tickwidth=1, tickcolor="gray"),
+                                bar=dict(color="#1f77b4", thickness=0.3),
+                                steps=[
+                                    dict(range=[0, 39], color="#ffcccc"),
+                                    dict(range=[39, 59], color="#ffe6cc"),
+                                    dict(range=[59, 74], color="#ffffcc"),
+                                    dict(range=[74, 89], color="#ccffcc"),
+                                    dict(range=[89, 100], color="#99ff99"),
+                                ],
+                                threshold=dict(
+                                    line=dict(color="red", width=4),
+                                    thickness=0.75,
+                                    value=score
+                                )
+                            )
+                        ))
+                        fig.update_layout(height=280, margin=dict(l=20, r=20, t=40, b=20))
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    with w2:
+                        categories = ["Technical\nSkills", "Domain\nExp.", "Projects", "Education", "Certifications", "Soft\nSkills"]
+                        weights = [40, 25, 15, 10, 5, 5]
+                        cat_scores = [
+                            breakdown.get("technical_skills", 0),
+                            breakdown.get("domain_experience", 0),
+                            breakdown.get("projects", 0),
+                            breakdown.get("education", 0),
+                            breakdown.get("certifications", 0),
+                            breakdown.get("soft_skills", 0),
+                        ]
+                        weighted_scores = [s * w / 100 for s, w in zip(cat_scores, weights)]
+
+                        fig2 = go.Figure()
+                        fig2.add_trace(go.Bar(
+                            y=categories,
+                            x=weighted_scores,
+                            name="Weighted Contribution",
+                            orientation="h",
+                            marker=dict(color="#1f77b4"),
+                            text=[f"{s:.1f}" for s in weighted_scores],
+                            textposition="outside",
+                        ))
+                        fig2.add_trace(go.Bar(
+                            y=categories,
+                            x=[w / 100 * 100 for w in weights],
+                            name="Max Possible",
+                            orientation="h",
+                            marker=dict(color="lightgray", opacity=0.4),
+                            text=[f"max {w}%" for w in weights],
+                            textposition="inside",
+                        ))
+                        fig2.update_layout(
+                            barmode="overlay",
+                            height=280,
+                            margin=dict(l=20, r=20, t=20, b=20),
+                            xaxis=dict(title="Points Contributed to Final Score", range=[0, 42]),
+                            showlegend=False,
+                        )
+                        st.plotly_chart(fig2, use_container_width=True)
+
+                    st.caption("Left: Overall ATS score with color-coded zones. Right: Each category's weighted contribution to the final score (gray = max possible, blue = actual).")
 
                     st.divider()
 
