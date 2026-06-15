@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 from modules import extract_text, analyze_resume, rank_candidates
 
 st.set_page_config(
@@ -150,6 +152,64 @@ if mode == "Single Resume":
                     with b3:
                         st.metric("Certifications", f"{breakdown.get('certifications', 0)}/100")
                         st.metric("Soft Skills", f"{breakdown.get('soft_skills', 0)}/100")
+
+                    st.divider()
+
+                    st.markdown("**Visualizations**")
+                    viz_col1, viz_col2 = st.columns(2)
+
+                    with viz_col1:
+                        categories = ["Technical Skills", "Domain Exp.", "Projects", "Education", "Certifications", "Soft Skills"]
+                        values = [
+                            breakdown.get("technical_skills", 0),
+                            breakdown.get("domain_experience", 0),
+                            breakdown.get("projects", 0),
+                            breakdown.get("education", 0),
+                            breakdown.get("certifications", 0),
+                            breakdown.get("soft_skills", 0)
+                        ]
+
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatterpolar(
+                            r=values + [values[0]],
+                            theta=categories + [categories[0]],
+                            fill="toself",
+                            name="Score",
+                            line_color="royalblue"
+                        ))
+                        fig.update_layout(
+                            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                            showlegend=False,
+                            height=300,
+                            margin=dict(l=40, r=40, t=30, b=30)
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    with viz_col2:
+                        skill_counts = pd.DataFrame({
+                            "Category": ["Matching", "Transferable", "Missing"],
+                            "Count": [len(matched), len(transferable), len(missing)]
+                        })
+                        fig2 = px.bar(
+                            skill_counts,
+                            x="Category",
+                            y="Count",
+                            color="Category",
+                            color_discrete_map={
+                                "Matching": "#2ecc71",
+                                "Transferable": "#f39c12",
+                                "Missing": "#e74c3c"
+                            },
+                            text="Count",
+                            height=300
+                        )
+                        fig2.update_traces(textposition="outside")
+                        fig2.update_layout(
+                            showlegend=False,
+                            margin=dict(l=20, r=20, t=30, b=30),
+                            yaxis=dict(dtick=1, range=[0, max(len(matched), len(transferable), len(missing), 1) + 1])
+                        )
+                        st.plotly_chart(fig2, use_container_width=True)
 
                     st.divider()
 
