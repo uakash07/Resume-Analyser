@@ -156,60 +156,28 @@ if mode == "Single Resume":
                     st.divider()
 
                     st.markdown("**Visualizations**")
-                    viz_col1, viz_col2 = st.columns(2)
 
-                    with viz_col1:
-                        categories = ["Technical Skills", "Domain Exp.", "Projects", "Education", "Certifications", "Soft Skills"]
-                        values = [
-                            breakdown.get("technical_skills", 0),
-                            breakdown.get("domain_experience", 0),
-                            breakdown.get("projects", 0),
-                            breakdown.get("education", 0),
-                            breakdown.get("certifications", 0),
-                            breakdown.get("soft_skills", 0)
-                        ]
+                    bdata = {
+                        "Technical Skills": breakdown.get("technical_skills", 0),
+                        "Domain Experience": breakdown.get("domain_experience", 0),
+                        "Projects": breakdown.get("projects", 0),
+                        "Education": breakdown.get("education", 0),
+                        "Certifications": breakdown.get("certifications", 0),
+                        "Soft Skills": breakdown.get("soft_skills", 0),
+                    }
+                    if any(v > 0 for v in bdata.values()):
+                        df_bd = pd.DataFrame(list(bdata.items()), columns=["Category", "Score"])
+                        st.bar_chart(df_bd.set_index("Category"), height=300)
+                    else:
+                        st.caption("Scoring breakdown not available from AI response.")
 
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatterpolar(
-                            r=values + [values[0]],
-                            theta=categories + [categories[0]],
-                            fill="toself",
-                            name="Score",
-                            line_color="royalblue"
-                        ))
-                        fig.update_layout(
-                            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                            showlegend=False,
-                            height=300,
-                            margin=dict(l=40, r=40, t=30, b=30)
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-
-                    with viz_col2:
-                        skill_counts = pd.DataFrame({
-                            "Category": ["Matching", "Transferable", "Missing"],
+                    st.bar_chart(
+                        pd.DataFrame({
+                            "Skill Type": ["Matching", "Transferable", "Missing"],
                             "Count": [len(matched), len(transferable), len(missing)]
-                        })
-                        fig2 = px.bar(
-                            skill_counts,
-                            x="Category",
-                            y="Count",
-                            color="Category",
-                            color_discrete_map={
-                                "Matching": "#2ecc71",
-                                "Transferable": "#f39c12",
-                                "Missing": "#e74c3c"
-                            },
-                            text="Count",
-                            height=300
-                        )
-                        fig2.update_traces(textposition="outside")
-                        fig2.update_layout(
-                            showlegend=False,
-                            margin=dict(l=20, r=20, t=30, b=30),
-                            yaxis=dict(dtick=1, range=[0, max(len(matched), len(transferable), len(missing), 1) + 1])
-                        )
-                        st.plotly_chart(fig2, use_container_width=True)
+                        }).set_index("Skill Type"),
+                        height=300
+                    )
 
                     st.divider()
 
