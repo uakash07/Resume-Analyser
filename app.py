@@ -8,229 +8,214 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("AI Resume Analyzer")
+st.markdown(
+    "<h1 style='text-align: center;'>AI Resume Analyzer</h1>"
+    "<p style='text-align: center; color: gray;'>Upload a resume, paste a job description, and get an instant ATS-style analysis.</p>",
+    unsafe_allow_html=True
+)
 
-st.markdown("---")
+st.divider()
 
-mode = st.radio(
-    "Select Analysis Mode:",
-    ["Single Resume Analysis", "Bulk Resume Ranking"],
-    horizontal=True,
+mode = st.segmented_control(
+    "Select Mode",
+    ["Single Resume", "Bulk Ranking"],
+    default="Single Resume",
     key="mode_selector"
 )
 
-st.markdown("---")
+st.divider()
 
-# MODE 1: SINGLE RESUME ANALYSIS
+# ── SINGLE RESUME MODE ──
 
-if mode == "Single Resume Analysis":
+if mode == "Single Resume":
 
     st.subheader("Single Resume Analysis")
 
-    col1, col2 = st.columns([1, 1])
+    upload_col, jd_col = st.columns(2)
 
-    with col1:
-        uploaded_file = st.file_uploader(
+    with upload_col:
+        resume_file = st.file_uploader(
             "Upload Resume (PDF)",
             type=["pdf"],
             key="single_uploader"
         )
 
-    with col2:
-        job_description = st.text_area(
-            "Paste Job Description",
-            height=200,
-            placeholder="Paste the full job description here. The more detail you provide, the more accurate the analysis will be.",
+    with jd_col:
+        job_desc = st.text_area(
+            "Job Description",
+            height=250,
+            placeholder="Paste the full job description here including required skills, responsibilities, and experience level.",
             key="single_jd"
         )
 
-    if job_description and len(job_description.strip()) < 50:
-        st.warning("Your job description looks very short. For accurate analysis, paste the full job description including required skills, responsibilities, and experience level.")
-
-    analyze_btn = st.button(
+    analyze = st.button(
         "Analyze Resume",
-        key="single_analyze",
-        use_container_width=True
+        type="primary",
+        use_container_width=True,
+        key="single_btn"
     )
 
-    if analyze_btn:
-
-        if not uploaded_file:
-            st.error("Please upload a resume PDF before analyzing.")
-        elif not job_description.strip():
-            st.error("Please paste a job description before analyzing.")
+    if analyze:
+        if resume_file is None:
+            st.error("Please upload a resume PDF.")
+        elif not job_desc.strip():
+            st.error("Please enter a job description.")
         else:
+            with st.status("Extracting text from PDF...", expanded=False) as status:
+                resume_text = extract_text(resume_file)
 
-            with st.spinner("Extracting text from PDF..."):
-                resume_text = extract_text(uploaded_file)
-
-            if not resume_text.strip():
-                st.error("Could not extract text. This PDF may be scanned or image-based.")
-            else:
-
-                with st.spinner("Analyzing resume with AI -- this may take 10-15 seconds..."):
-                    result = analyze_resume(resume_text, job_description)
-
-                if "error" in result:
-                    st.error(f"Analysis failed: {result['error']}")
+                if not resume_text.strip():
+                    status.update(label="Extraction failed", state="error")
+                    st.error("Could not extract text. The PDF may be scanned or image-based.")
                 else:
+                    status.update(label="Text extracted successfully", state="complete")
 
-                    st.markdown("---")
-                    st.subheader("Analysis Results")
+            if resume_text.strip():
+                with st.status("Analyzing with AI...", expanded=False) as status:
+                    result = analyze_resume(resume_text, job_desc)
+                    if "error" in result:
+                        status.update(label="Analysis failed", state="error")
+                        st.error(f"Analysis failed: {result['error']}")
+                    else:
+                        status.update(label="Analysis complete", state="complete")
 
-                    match_pct = result.get("match_percentage", 0)
-                    recommendation = result.get("recommendation", "N/A")
+                if "error" not in result:
+                    st.divider()
+                    st.subheader("Results")
 
-                    metric_col, rec_col = st.columns([1, 2])
+                    score = result.get("match_percentage", 0)
+                    rec = result.get("recommendation", "N/A")
 
-                    with metric_col:
-                        st.metric(label="ATS Match Score", value=f"{match_pct}%")
-
+                    sc_col, rec_col = st.columns([1, 2])
+                    with sc_col:
+                        st.metric("ATS Match Score", f"{score}%")
                     with rec_col:
-                        if "Strong" in recommendation:
-                            st.success(f"Recommendation: {recommendation}")
-                        elif "Moderate" in recommendation:
-                            st.warning(f"Recommendation: {recommendation}")
+                        if "Strong" in rec:
+                            st.success(f"Recommendation: {rec}")
+                        elif "Moderate" in rec:
+                            st.warning(f"Recommendation: {rec}")
                         else:
-                            st.error(f"Recommendation: {recommendation}")
+                            st.error(f"Recommendation: {rec}")
 
-                    st.markdown("---")
+                    st.divider()
 
-                    # SKILLS SECTION
-                    skills_col1, skills_col2, skills_col3 = st.columns(3)
+                    match_col, partial_col, miss_col = st.columns(3)
 
-                    with skills_col1:
-                        matching_skills = result.get("matching_skills", [])
-                        st.markdown(f"### Matching Skills ({len(matching_skills)})")
-                        if matching_skills:
-                            for skill in matching_skills:
-                                st.success(skill)
+                    with match_col:
+                        matched = result.get("matching_skills", [])
+                        st.markdown(f"**Matching Skills ({len(matched)})**")
+                        if matched:
+                            for s in matched:
+                                st.success(s)
                         else:
-                            st.info("No matching skills found.")
+                            st.caption("None identified")
 
-                    with skills_col2:
-                        partial_skills = result.get("partial_matching_skills", [])
-                        st.markdown(f"### Partial Match ({len(partial_skills)})")
-                        if partial_skills:
-                            for skill in partial_skills:
-                                st.warning(skill)
+                    with partial_col:
+                        partial = result.get("partial_matching_skills", [])
+                        st.markdown(f"**Partial Match ({len(partial)})**")
+                        if partial:
+                            for s in partial:
+                                st.warning(s)
                         else:
-                            st.info("No partial matches identified.")
+                            st.caption("None identified")
 
-                    with skills_col3:
-                        missing_skills = result.get("missing_skills", [])
-                        st.markdown(f"### Missing Skills ({len(missing_skills)})")
-                        if missing_skills:
-                            for skill in missing_skills:
-                                st.error(skill)
+                    with miss_col:
+                        missing = result.get("missing_skills", [])
+                        st.markdown(f"**Missing Skills ({len(missing)})**")
+                        if missing:
+                            for s in missing:
+                                st.error(s)
                         else:
-                            st.success("Your resume covers all required skills!")
+                            st.caption("None identified")
 
-                    st.markdown("---")
+                    st.divider()
 
-                    # STRENGTHS AND IMPROVEMENTS
                     str_col, imp_col = st.columns(2)
 
                     with str_col:
-                        strengths = result.get("strengths", [])
-                        st.markdown(f"### Strengths ({len(strengths)})")
-                        for point in strengths:
-                            st.markdown(f"- {point}")
+                        st.markdown("**Strengths**")
+                        for p in result.get("strengths", []):
+                            st.markdown(f"- {p}")
 
                     with imp_col:
-                        improvements = result.get("improvements", [])
-                        st.markdown(f"### Areas for Improvement ({len(improvements)})")
-                        for point in improvements:
-                            st.markdown(f"- {point}")
+                        st.markdown("**Areas for Improvement**")
+                        for p in result.get("improvements", []):
+                            st.markdown(f"- {p}")
 
-                    st.markdown("---")
+                    st.divider()
+                    st.markdown("**AI Suggestions**")
+                    st.markdown(result.get("ai_suggestions", "No suggestions available."))
 
-                    # AI SUGGESTIONS
-                    st.markdown("### AI-Powered Suggestions")
-                    ai_suggestions = result.get("ai_suggestions", "No suggestions available.")
-                    st.markdown(ai_suggestions)
+# ── BULK RANKING MODE ──
 
-# MODE 2: BULK RESUME RANKING
-
-elif mode == "Bulk Resume Ranking":
+elif mode == "Bulk Ranking":
 
     st.subheader("Bulk Resume Ranking")
 
-    bulk_col1, bulk_col2 = st.columns([1, 1])
+    bc1, bc2 = st.columns(2)
 
-    with bulk_col1:
-        uploaded_files = st.file_uploader(
+    with bc1:
+        files = st.file_uploader(
             "Upload Multiple Resumes (PDF)",
             type=["pdf"],
             accept_multiple_files=True,
             key="bulk_uploader"
         )
 
-    with bulk_col2:
+    with bc2:
         bulk_jd = st.text_area(
-            "Paste Job Description",
-            height=200,
-            placeholder="Paste the full job description. More detail = more accurate ranking.",
+            "Job Description",
+            height=250,
+            placeholder="Paste the job description for ranking candidates against.",
             key="bulk_jd"
         )
 
-    if bulk_jd and len(bulk_jd.strip()) < 50:
-        st.warning("Job description looks very short. Paste the full description for accurate ranking.")
-
-    analyze_all_btn = st.button(
+    analyze_all = st.button(
         "Analyze All Resumes",
-        key="bulk_analyze",
-        use_container_width=True
+        type="primary",
+        use_container_width=True,
+        key="bulk_btn"
     )
 
-    if analyze_all_btn:
-
-        if not uploaded_files:
+    if analyze_all:
+        if not files:
             st.error("Please upload at least one resume PDF.")
         elif not bulk_jd.strip():
-            st.error("Please paste a job description before analyzing.")
+            st.error("Please enter a job description.")
         else:
-
             all_results = []
-            progress_bar = st.progress(0)
-            total_files = len(uploaded_files)
-            status_text = st.empty()
+            bar = st.progress(0, text="Starting...")
+            total = len(files)
 
-            for idx, pdf_file in enumerate(uploaded_files):
-
-                candidate_name = pdf_file.name.replace(".pdf", "").replace("_", " ").replace("-", " ")
-
-                status_text.text(f"Analyzing {candidate_name} ({idx + 1}/{total_files})...")
+            for i, f in enumerate(files):
+                name = f.name.replace(".pdf", "").replace("_", " ").replace("-", " ")
+                bar.progress((i) / total, text=f"Processing {name} ({i+1}/{total})...")
 
                 try:
-                    resume_text = extract_text(pdf_file)
-
-                    if not resume_text.strip():
-                        st.warning(f"Skipping {candidate_name}: could not extract text.")
-                        progress_bar.progress((idx + 1) / total_files)
+                    text = extract_text(f)
+                    if not text.strip():
+                        st.warning(f"Skipped {name}: could not extract text.")
+                        bar.progress((i + 1) / total, text=f"Skipped {name}")
                         continue
 
-                    with st.spinner(f"Analyzing {candidate_name}..."):
-                        result = analyze_resume(resume_text, bulk_jd)
-
-                    if "error" in result:
-                        st.warning(f"Skipping {candidate_name}: {result['error']}")
-                        progress_bar.progress((idx + 1) / total_files)
+                    r = analyze_resume(text, bulk_jd)
+                    if "error" in r:
+                        st.warning(f"Skipped {name}: {r['error']}")
+                        bar.progress((i + 1) / total, text=f"Skipped {name}")
                         continue
 
-                    result["candidate_name"] = candidate_name
-                    all_results.append(result)
+                    r["candidate_name"] = name
+                    all_results.append(r)
 
                 except Exception as e:
-                    st.warning(f"Error processing {candidate_name}: {str(e)}")
+                    st.warning(f"Error on {name}: {e}")
 
-                progress_bar.progress((idx + 1) / total_files)
+                bar.progress((i + 1) / total, text=f"Done ({i+1}/{total})")
 
-            status_text.text("All resumes analyzed!")
+            bar.progress(1.0, text="All done!")
 
             if all_results:
-
-                ranking_data = [
+                data = [
                     {
                         "candidate_name": r["candidate_name"],
                         "match_percentage": r.get("match_percentage", 0),
@@ -238,57 +223,53 @@ elif mode == "Bulk Resume Ranking":
                     }
                     for r in all_results
                 ]
+                df = rank_candidates(data)
 
-                ranked_df = rank_candidates(ranking_data)
-
-                st.markdown("---")
-                st.subheader(f"Candidate Rankings ({len(ranked_df)} candidates)")
+                st.divider()
+                st.subheader(f"Candidate Rankings ({len(df)} candidates)")
 
                 def highlight_top3(row):
                     if row.name <= 3:
                         return ["background-color: #d4edda; color: #155724"] * len(row)
                     return [""] * len(row)
 
-                styled_df = ranked_df.style.apply(highlight_top3, axis=1)
-
                 st.dataframe(
-                    styled_df,
+                    df.style.apply(highlight_top3, axis=1),
                     use_container_width=True,
-                    height=min(400, 50 + len(ranked_df) * 40)
+                    height=min(400, 50 + len(df) * 40)
                 )
 
-                st.markdown("---")
+                st.divider()
                 st.subheader("Detailed Results")
 
                 for r in all_results:
                     with st.expander(f"{r['candidate_name']} - {r.get('match_percentage', 0)}% Match"):
+                        c1, c2, c3 = st.columns(3)
 
-                        detail_col1, detail_col2, detail_col3 = st.columns(3)
+                        with c1:
+                            m = r.get("matching_skills", [])
+                            st.markdown(f"**Matching ({len(m)})**")
+                            for s in m:
+                                st.success(s)
 
-                        with detail_col1:
-                            matching = r.get("matching_skills", [])
-                            st.markdown(f"**Matching Skills ({len(matching)})**")
-                            for skill in matching:
-                                st.success(skill)
+                        with c2:
+                            p = r.get("partial_matching_skills", [])
+                            st.markdown(f"**Partial ({len(p)})**")
+                            for s in p:
+                                st.warning(s)
 
-                        with detail_col2:
-                            partial = r.get("partial_matching_skills", [])
-                            st.markdown(f"**Partial Match ({len(partial)})**")
-                            for skill in partial:
-                                st.warning(skill)
+                        with c3:
+                            ms = r.get("missing_skills", [])
+                            st.markdown(f"**Missing ({len(ms)})**")
+                            for s in ms:
+                                st.error(s)
 
-                        with detail_col3:
-                            missing = r.get("missing_skills", [])
-                            st.markdown(f"**Missing Skills ({len(missing)})**")
-                            for skill in missing:
-                                st.error(skill)
-
-                        st.markdown("**Areas for Improvement**")
-                        for point in r.get("improvements", []):
-                            st.markdown(f"- {point}")
+                        st.markdown("**Improvements**")
+                        for pt in r.get("improvements", []):
+                            st.markdown(f"- {pt}")
 
                         st.markdown("**AI Suggestions**")
                         st.markdown(r.get("ai_suggestions", "N/A"))
 
             else:
-                st.error("No resumes could be analyzed. Please check your PDFs and try again.")
+                st.error("No resumes could be analyzed. Check your PDFs and try again.")
