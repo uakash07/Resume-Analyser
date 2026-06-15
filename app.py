@@ -83,23 +83,31 @@ if mode == "Single Resume":
                     st.divider()
                     st.subheader("Results")
 
-                    score = result.get("match_percentage", 0)
-                    rec = result.get("recommendation", "N/A")
+                    score = result.get("score", 0)
+                    classification = result.get("classification", "N/A")
+                    domain = result.get("job_domain", "")
 
-                    sc_col, rec_col = st.columns([1, 2])
+                    sc_col, cls_col, dm_col = st.columns(3)
                     with sc_col:
-                        st.metric("ATS Match Score", f"{score}%")
-                    with rec_col:
-                        if "Strong" in rec:
-                            st.success(f"Recommendation: {rec}")
-                        elif "Moderate" in rec:
-                            st.warning(f"Recommendation: {rec}")
+                        st.metric("ATS Score", f"{score}/100")
+                    with cls_col:
+                        if "Excellent" in classification:
+                            st.success(f"Classification: {classification}")
+                        elif "Strong" in classification:
+                            st.success(f"Classification: {classification}")
+                        elif "Potential" in classification:
+                            st.warning(f"Classification: {classification}")
+                        elif "Partial" in classification:
+                            st.warning(f"Classification: {classification}")
                         else:
-                            st.error(f"Recommendation: {rec}")
+                            st.error(f"Classification: {classification}")
+                    with dm_col:
+                        if domain:
+                            st.info(f"Domain: {domain}")
 
                     st.divider()
 
-                    match_col, partial_col, miss_col = st.columns(3)
+                    match_col, trans_col, miss_col = st.columns(3)
 
                     with match_col:
                         matched = result.get("matching_skills", [])
@@ -110,18 +118,18 @@ if mode == "Single Resume":
                         else:
                             st.caption("None identified")
 
-                    with partial_col:
-                        partial = result.get("partial_matching_skills", [])
-                        st.markdown(f"**Partial Match ({len(partial)})**")
-                        if partial:
-                            for s in partial:
+                    with trans_col:
+                        transferable = result.get("transferable_skills", [])
+                        st.markdown(f"**Transferable Skills ({len(transferable)})**")
+                        if transferable:
+                            for s in transferable:
                                 st.warning(s)
                         else:
                             st.caption("None identified")
 
                     with miss_col:
-                        missing = result.get("missing_skills", [])
-                        st.markdown(f"**Missing Skills ({len(missing)})**")
+                        missing = result.get("missing_critical_skills", [])
+                        st.markdown(f"**Missing Critical Skills ({len(missing)})**")
                         if missing:
                             for s in missing:
                                 st.error(s)
@@ -130,21 +138,28 @@ if mode == "Single Resume":
 
                     st.divider()
 
-                    str_col, imp_col = st.columns(2)
-
-                    with str_col:
-                        st.markdown("**Strengths**")
-                        for p in result.get("strengths", []):
-                            st.markdown(f"- {p}")
-
-                    with imp_col:
-                        st.markdown("**Areas for Improvement**")
-                        for p in result.get("improvements", []):
-                            st.markdown(f"- {p}")
+                    breakdown = result.get("scoring_breakdown", {})
+                    st.markdown("**Scoring Breakdown**")
+                    b1, b2, b3 = st.columns(3)
+                    with b1:
+                        st.metric("Technical Skills", f"{breakdown.get('technical_skills', 0)}/100")
+                        st.metric("Domain Experience", f"{breakdown.get('domain_experience', 0)}/100")
+                    with b2:
+                        st.metric("Projects", f"{breakdown.get('projects', 0)}/100")
+                        st.metric("Education", f"{breakdown.get('education', 0)}/100")
+                    with b3:
+                        st.metric("Certifications", f"{breakdown.get('certifications', 0)}/100")
+                        st.metric("Soft Skills", f"{breakdown.get('soft_skills', 0)}/100")
 
                     st.divider()
-                    st.markdown("**AI Suggestions**")
-                    st.markdown(result.get("ai_suggestions", "No suggestions available."))
+
+                    st.markdown("**Areas for Improvement**")
+                    for p in result.get("improvements", []):
+                        st.markdown(f"- {p}")
+
+                    st.divider()
+                    st.markdown("**Recruiter Summary**")
+                    st.markdown(result.get("recruiter_summary", "No summary available."))
 
 # ── BULK RANKING MODE ──
 
@@ -218,8 +233,8 @@ elif mode == "Bulk Ranking":
                 data = [
                     {
                         "candidate_name": r["candidate_name"],
-                        "match_percentage": r.get("match_percentage", 0),
-                        "recommendation": r.get("recommendation", "N/A")
+                        "score": r.get("score", 0),
+                        "classification": r.get("classification", "N/A")
                     }
                     for r in all_results
                 ]
@@ -243,7 +258,7 @@ elif mode == "Bulk Ranking":
                 st.subheader("Detailed Results")
 
                 for r in all_results:
-                    with st.expander(f"{r['candidate_name']} - {r.get('match_percentage', 0)}% Match"):
+                    with st.expander(f"{r['candidate_name']} - Score: {r.get('score', 0)}/100"):
                         c1, c2, c3 = st.columns(3)
 
                         with c1:
@@ -253,14 +268,14 @@ elif mode == "Bulk Ranking":
                                 st.success(s)
 
                         with c2:
-                            p = r.get("partial_matching_skills", [])
-                            st.markdown(f"**Partial ({len(p)})**")
-                            for s in p:
+                            t = r.get("transferable_skills", [])
+                            st.markdown(f"**Transferable ({len(t)})**")
+                            for s in t:
                                 st.warning(s)
 
                         with c3:
-                            ms = r.get("missing_skills", [])
-                            st.markdown(f"**Missing ({len(ms)})**")
+                            ms = r.get("missing_critical_skills", [])
+                            st.markdown(f"**Missing Critical ({len(ms)})**")
                             for s in ms:
                                 st.error(s)
 
@@ -268,8 +283,8 @@ elif mode == "Bulk Ranking":
                         for pt in r.get("improvements", []):
                             st.markdown(f"- {pt}")
 
-                        st.markdown("**AI Suggestions**")
-                        st.markdown(r.get("ai_suggestions", "N/A"))
+                        st.markdown("**Recruiter Summary**")
+                        st.markdown(r.get("recruiter_summary", "N/A"))
 
             else:
                 st.error("No resumes could be analyzed. Check your PDFs and try again.")
