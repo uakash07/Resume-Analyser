@@ -167,7 +167,7 @@ Validation Rules:
 
     try:
         response = client.chat.completions.create(
-            model="meta/llama-3.1-8b-instruct",
+            model="meta/llama-3.1-70b-instruct",
             messages=[
                 {
                     "role": "system",
@@ -179,7 +179,7 @@ Validation Rules:
                 }
             ],
             temperature=0.1,
-            max_tokens=2000
+            max_tokens=3000
         )
 
         raw_text = response.choices[0].message.content
