@@ -2,31 +2,22 @@ import os
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
-
 load_dotenv()
-
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-
 client = OpenAI(
     api_key=NVIDIA_API_KEY,
     base_url="https://integrate.api.nvidia.com/v1"
 )
-
 def analyze_resume(resume_text: str, job_description: str) -> dict:
     """Analyze resume against job description with semantic matching and weighted scoring."""
-
     prompt = f"""You are a senior technical recruiter and ATS expert with 15+ years of experience.
-
-Analyze this resume against the job description.
-
+Analyze this resume against the job description
 RESUME:
 {resume_text}
-
 JOB DESCRIPTION:
 {job_description}
 
 RULES:
-
 1. SEMANTIC MATCHING:
    - "MongoDB" IS a "NoSQL database" — match it.
    - "Scikit-learn" IS "Machine Learning" — match it.
